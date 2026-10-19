@@ -418,6 +418,28 @@ footer{background:#EAF0F6;border-top:1px solid #D9E3ED;margin-top:28px;padding:2
 details.source.fold{background:transparent;box-shadow:none;margin-top:22px;font-size:.78rem}
 details.source.fold>summary{font-size:.78rem;padding:10px 13px}
 @media(max-width:620px){.hall-extension{grid-template-columns:minmax(0,1fr);gap:12px}.action-fields{grid-template-columns:minmax(0,1fr);gap:3px}.action-fields dd{margin-bottom:8px}.priority-list{margin:10px 0}.priority-list>li{gap:10px}.priority-list strong{font-size:.88rem}.priority-list p{font-size:.84rem}.hall-index a{font-size:.76rem;padding:7px 9px}}
+
+/* Respaldo de las barras, accesible también con teclado y pantalla táctil. */
+dialog:has(.bar-detail){width:min(1040px,94vw);max-width:94vw}
+.interactive-bars{gap:7px;position:relative;min-width:0}
+.graph-guide{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:5px 0 0}
+.graph-guide p{margin:0;max-width:90ch}.graph-help{white-space:nowrap;flex:none;font-size:.75rem!important}
+.graph-hint{margin:0 0 8px!important;color:var(--muted);font-size:.75rem!important}
+.bar-row .bar-track{height:26px;overflow:visible;isolation:isolate}
+.bar-row .bar-seg{display:block;flex:none;border:0;padding:0;border-radius:0;cursor:pointer;position:relative}
+.bar-seg:first-child{border-radius:5px 0 0 5px}.bar-seg:last-child{border-radius:0 5px 5px 0}.bar-seg:only-child{border-radius:5px}
+.bar-seg:hover{filter:brightness(.9)}.bar-seg:focus-visible{outline:3px solid var(--navy);outline-offset:3px;z-index:2}
+.bar-row button.lab{color:var(--navy);text-decoration:underline;text-decoration-color:#b8c9db;text-underline-offset:3px;min-height:44px}
+.bar-value{border:0;background:transparent;padding:4px 0 4px 4px;text-align:right;color:var(--navy);cursor:pointer;min-height:44px;min-width:0}
+.bar-value .val{display:block;line-height:1.4}.bar-note{display:block;font-size:.7rem;font-weight:400;color:var(--muted);line-height:1.45;margin-top:2px}
+.bar-value:hover .val{text-decoration:underline}.bar-value:focus-visible,.graph-total:focus-visible{outline:2px solid var(--navy);outline-offset:3px;border-radius:3px}
+.graph-tooltip{position:fixed;z-index:1000;background:var(--navy);color:white;box-shadow:0 6px 24px #0b25452b;border-radius:8px;padding:12px 14px;width:max-content;max-width:min(360px,calc(100vw - 24px));font-size:.8rem;line-height:1.55;pointer-events:none}
+.graph-tooltip[hidden]{display:none}.graph-tooltip span,.graph-tooltip strong{display:block}.tip-action{margin-top:5px;opacity:.82;font-size:.73rem}
+.graph-selection{font-weight:600;color:var(--navy);margin-bottom:5px}.graph-amount{font-size:.95rem;line-height:1.5;margin:0 0 6px}.graph-amount strong{font-size:1.8rem;color:var(--navy);margin-right:5px}
+.graph-denominator{font-size:.86rem;margin:6px 0 10px}.graph-breakdown{margin:14px 0}.graph-limit{background:var(--navy-tint);border-left:3px solid var(--navy);border-radius:5px;padding:10px 12px;font-size:.83rem;line-height:1.6;margin:14px 0}
+.bar-detail h4{font-size:.88rem;margin:18px 0 6px}.graph-sources{border-top:1px solid var(--line);margin-top:20px;padding-top:2px}.graph-sources p{margin:7px 0}.graph-career{margin-top:12px}
+.overview-data{margin-top:10px;font-size:.73rem!important;align-self:flex-start}
+@media(max-width:620px){.graph-guide{gap:8px}.graph-guide .mini{font-size:.78rem}.graph-help{padding:4px 7px!important}.bar-row .bar-track{height:30px}.graph-breakdown .chip{white-space:normal;text-align:left}.graph-amount{font-size:.88rem}.bar-row .bar-value .val{font-size:.84rem}.bar-row .bar-note{font-size:.69rem}}
 </style>
 </head>
 <body>
@@ -681,20 +703,269 @@ function select(label, options, value, onchange, id) {
   return h('label', { class: 'ctl' }, label, s);
 }
 
-/* Barras horizontales (con segmentos opcionales) */
-function bars(rows, opt = {}) {
-  const max = opt.max || Math.max(1, ...rows.map(r => r.total !== undefined ? r.total : sum(r.segs || [], s => s.v)));
-  const box = h('div', { class: 'bars' });
-  rows.forEach(r => {
-    const tot = r.total !== undefined ? r.total : sum(r.segs, s => s.v);
-    const segs = r.segs || [{ v: tot, color: r.color || 'var(--navy)' }];
-    const lab = r.onClick ? h('button', { class: 'lab', type: 'button', 'aria-pressed': r.sel ? 'true' : 'false', onclick: r.onClick }, r.label) : h('span', { class: 'lab' }, r.label);
-    box.appendChild(h('div', { class: 'bar-row' + (r.sel ? ' sel' : '') }, lab,
-      h('div', { class: 'bar-track', role: 'img', 'aria-label': `${r.label}: ${r.valueText || fmt(tot)}` }, segs.map(s => s.v > 0 ? h('div', { class: 'bar-seg', title: (s.t ? s.t + ': ' : '') + fmt(s.v), style: { width: (100 * s.v / max) + '%', background: s.color } }) : null)),
-      h('span', { class: 'val' }, r.valueText || fmt(tot))));
+/* Consulta de las unidades y registros que componen las barras. Se inserta en el HTML. */
+function graphSpec(id, context = {}) {
+  const artCols = [
+    {h:'CFT',v:r=>instNice(r.i)}, {h:'Perfil según articulación',v:r=>r.nombre},
+    {h:'Código base',k:'base'}, {h:'Códigos y versiones en el registro',v:r=>r.cods.join('; ')},
+    {h:'Carreras registradas',v:r=>r.carreras.join('; ')}, {h:'Sector según catálogo',k:'sector'},
+    {h:'Filas de articulación en la base',v:r=>r.rows.map(x=>x.f).join('; ')}
+  ];
+  const mxCols = [
+    {h:'Nombre citado en la matriz',k:'nm'}, {h:'Código y versión en la matriz',k:'cod'},
+    {h:'Comparación con catálogo',v:r=>ST[catStatus(r.cod)].l},
+    {h:'Código en el catálogo',v:r=>catByBase.get(r.base)?.c || 'No encontrado'},
+    {h:'Semestres',v:r=>r.sems.join('; ')}, {h:'Módulos que lo citan',v:r=>r.mods.join('; ')},
+    {h:'Hoja de matriz',k:'k'}
+  ];
+  const planCols = [
+    {h:'Código del plan',k:'p'}, {h:'Plan',k:'n'}, {h:'Nivel del plan',v:r=>r.lv || 'No informado'},
+    {h:'Duración nominal en horas',k:'h'},
+    {h:'Perfiles de la matriz vinculados por código base',v:r=>uniq(C.carPlan.filter(x=>x.plan.p===r.p).map(x=>x.cod)).join('; ')},
+    {h:'Carreras de la matriz',v:r=>uniq(C.carPlan.filter(x=>x.plan.p===r.p).map(x=>x.k)).join('; ')}
+  ];
+  const specs = {
+    'cft-medida': {
+      title:'Registros de articulación por CFT Estatal', src:['CV_ART'],
+      unit:({bases:'perfiles por código base',cods:'perfiles por código y versión',reg:'registros de articulación',car:'carreras registradas'})[context.unit],
+      read:'El largo representa la medida seleccionada. Un registro, un perfil y una carrera son unidades distintas.',
+      limit:'La cantidad registrada no mide calidad institucional ni acredita cambios posteriores a la recopilación.',
+      get:(key)=>{
+        const raw=ART.filter(r=>r.i===key), mode=context.unit;
+        const groups=[...by(raw,r=>mode==='bases'?baseOf(r.c):mode==='cods'?r.c:mode==='car'?r.k:String(r.f)).values()];
+        return {rows:groups.map(rs=>({name:mode==='car'?rs[0].k:rs[0].p,code:mode==='car'?'No corresponde':mode==='bases'?baseOf(rs[0].c):rs[0].c,
+          versions:uniq(rs.map(r=>r.c)).join('; '),careers:uniq(rs.map(r=>r.k)).join('; '),lines:rs.map(r=>r.f).join('; ')})),
+          cols:[{h:mode==='car'?'Carrera registrada':'Perfil según articulación',k:'name'}, {h:'Código contado',k:'code'},
+            {h:'Códigos y versiones en los registros',k:'versions'},{h:'Carreras en los registros',k:'careers'},{h:'Filas de articulación en la base',k:'lines'}],
+          calc:mode==='reg'?'Se cuenta cada registro de articulación de la institución.':mode==='car'?'Se cuenta cada denominación de carrera una vez en la institución.':mode==='bases'?'Se cuenta cada código base una vez en la institución, aunque tenga varias versiones o carreras.':'Se cuenta cada código completo con versión una vez en la institución.',
+          den:null};
+      }
+    },
+    'art-sector': {
+      title:'Articulación por sector productivo',src:['CV_ART','CV_CAT'],unit:'pares CFT y perfil por código base',
+      read:'Cada perfil se cuenta una vez por CFT. Los colores separan Coquimbo de los otros nueve CFT.',
+      limit:'Un mismo perfil puede contarse en varios CFT. El sector corresponde al catálogo Chile Valora; no es la clasificación de SENCE.',
+      get:(key,seg)=>({rows:C.artPairs.filter(r=>r.sector===key&&(seg===null||((r.i===COQ)===(seg===0)))),cols:artCols,
+        calc:'Se cuenta una relación por CFT y código base en el sector. Las versiones no aumentan el conteo.',den:{n:C.artPairs.length,label:'pares CFT y perfil en los diez CFT'}})
+    },
+    'art-compartidos': {
+      title:'Perfiles según cantidad de CFT que los registran',src:['CV_ART'],unit:'perfiles por código base',
+      read:'El número de CFT de la etiqueta define el grupo. El largo indica cuántos perfiles pertenecen a ese grupo.',
+      limit:'Los perfiles se cuentan una sola vez en este gráfico, a diferencia de los pares CFT y perfil del gráfico por sector.',
+      get:key=>({rows:[...C.artShare.entries()].filter(([b,ps])=>ps.length===key).map(([b,ps])=>({base:b,name:ps[0].nombre,n:ps.length,
+        cft:ps.map(p=>instNice(p.i)).join('; '),codes:uniq(ps.flatMap(p=>p.cods)).join('; '),lines:ps.map(p=>instNice(p.i)+': '+p.rows.map(r=>r.f).join(', ')).join('; ')})),
+        cols:[{h:'Perfil según articulación',k:'name'},{h:'Código base',k:'base'},{h:'Cantidad de CFT',k:'n'},{h:'CFT que lo registran',k:'cft'},
+          {h:'Códigos y versiones registrados',k:'codes'},{h:'Filas de articulación por CFT',k:'lines'}],
+        calc:'Se agrupan los códigos base por número de CFT distintos que los registran. Cada fila del detalle es un perfil.',den:{n:C.artBases.length,label:'perfiles distintos en los diez CFT'}})
+    },
+    'matriz-catalogo': {
+      title:'Correspondencia de perfiles de cada carrera con el catálogo',src:['CFT_MX','CV_CAT'],unit:'perfiles por código y versión',
+      read:'El largo es el total de perfiles de la carrera. Cada color indica su correspondencia con el catálogo.',
+      limit:'Un perfil compartido se cuenta en cada carrera que lo cita. Una versión diferente requiere revisión de contenidos; no demuestra equivalencia.',
+      get:(key,seg)=>({rows:MXPAIRS.filter(r=>r.k===key&&(seg===null||catStatus(r.cod)===['exacta','base','sin'][seg])),cols:mxCols,
+        calc:'Cada código con versión se cuenta una vez por carrera, aunque figure en varios módulos.',den:{n:C.mxPerCar[key].codes.length,label:'perfiles de esta carrera en la matriz'}})
+    },
+    'certificados-sector': {
+      title:'Certificados históricos regionales por sector',src:['CV_CERT'],unit:'certificados acumulados',
+      read:'El largo suma certificados de la serie 2002-2026. El detalle muestra los perfiles que aportan a esa suma.',
+      limit:'Los certificados no equivalen a personas únicas ni a evaluaciones disponibles hoy. El sector se conserva tal como aparece en la tabla de certificados.',
+      get:key=>({rows:D.cert.filter(r=>r.s===key),cols:[{h:'Perfil según la tabla de certificados',k:'n'},{h:'Código base',k:'b'},
+        {h:'Certificados acumulados',k:'v',n:true},{h:'Sector de la tabla de certificados',k:'s'},{h:'Fila en la base',k:'f'}],weight:r=>r.v,
+        calc:'Se suman los certificados de todas las filas del sector. El número de filas del detalle no es el número de certificados.',den:{n:C.certTotal,label:'certificados históricos de la Región de Coquimbo'}})
+    },
+    'centros-sector': {
+      title:'Combinaciones de centro y perfil por sector',src:['CV_CEN'],unit:'combinaciones centro y perfil con versión',
+      read:'Cada combinación de centro y perfil cuenta una vez. El color identifica el centro; un perfil puede aparecer en ambos.',
+      limit:'La región y la vigencia son las del registro consultado. La asociación no confirma cupos, fechas de evaluación ni condiciones actuales de acceso.',
+      get:(key,seg)=>({rows:D.cenCoq.filter(r=>r.s===key&&(seg===null||r.ct===uniq(D.cenCoq.map(x=>x.ct))[seg])),
+        cols:[{h:'Centro',k:'ct'},{h:'Perfil según registro de centros',k:'p'},{h:'Código y versión',k:'c'},{h:'Sector del registro de centros',k:'s'},
+          {h:'Vigencia del centro según registro',k:'vg'},{h:'Fila en la base',k:'f'}],
+        calc:'Se cuenta cada combinación de centro y perfil con versión de la tabla de centros de Coquimbo. Un perfil registrado por dos centros aporta dos combinaciones.',
+        den:{n:D.cenCoq.length,label:'combinaciones centro y perfil registradas en Coquimbo'}})
+    },
+    'carrera-plan': {
+      title:'Perfiles con y sin plan vinculado por carrera',src:['CFT_MX','SE_PF'],unit:'perfiles por código y versión',
+      read:'El largo es el total de perfiles de la carrera, no la cantidad de planes. El porcentaje corresponde a perfiles con plan dentro de esa carrera.',
+      limit:'La vinculación usa el código base y puede incluir versiones diferentes. Sin plan vinculado describe este cruce documental, no toda la oferta de capacitación.',
+      get:(key,seg)=>({rows:MXPAIRS.filter(r=>r.k===key&&(seg===null||(pfByBase.has(r.base)===(seg===0)))),
+        cols:[...mxCols.filter((c,i)=>i!==2&&i!==3),{h:'Planes vinculados por código base',v:r=>pfByBase.has(r.base)?[...pfByBase.get(r.base).values()].map(p=>p.p+' · '+p.n).join('; '):'Sin plan vinculado'},
+          {h:'Versiones de perfil declaradas por los planes vinculados',v:r=>pfByBase.has(r.base)?uniq([...pfByBase.get(r.base).values()].flatMap(p=>p.cs.filter(c=>baseOf(c)===r.base))).join('; '):'No corresponde'}],
+        calc:'Se cuenta cada código con versión una vez en la carrera y se verifica si su código base figura en al menos un plan. Tener varios planes no aumenta este conteo.',
+        den:{n:C.mxPerCar[key].codes.length,label:'perfiles de esta carrera en la matriz'}})
+    },
+    'planes-area': {
+      title:'Planes vinculados a la matriz por área del plan',src:['CFT_MX','SE_PF'],unit:'planes formativos distintos',
+      read:'Cada plan cuenta una vez, aunque se relacione con varias carreras o perfiles. El área es la del catálogo de planes.',
+      limit:'Son planes del catálogo nacional vinculados por código base; su presencia no acredita ejecución en Coquimbo ni equivalencia curricular.',
+      get:key=>({rows:D.pf.filter(p=>p.ar===key&&C.carPlanU.some(r=>r.plan.p===p.p)),cols:planCols,
+        calc:'Se cuenta cada código de plan una vez, entre los planes vinculados a perfiles de la matriz.',den:{n:C.mxPfPlanes,label:'planes distintos vinculados a la matriz, no los 778 del catálogo completo'}})
+    },
+    'sence-area': {
+      title:'Participantes aprobados por área de capacitación',src:['SE_EST'],unit:'participantes aprobados según registro administrativo',
+      read:'Se muestran las diez áreas con más participantes. Cada porcentaje usa el total regional de las 24 áreas.',
+      limit:'El archivo recibido contiene totales por área, sin personas, cursos ni planes que permitan desagregar cada cifra. No identifica personas únicas ni ejecución de Planes Formativos.',
+      get:key=>({rows:D.senceArea.filter(r=>r.a===key),cols:[{h:'Área de capacitación, tabla A.20',k:'a'},{h:'Participantes aprobados',k:'v',n:true},
+        {h:'Región',v:()=>'Coquimbo'},{h:'Año',v:()=>2025},{h:'Nivel del dato recibido',v:()=>'Total agregado por área'}],weight:r=>r.v,aggregate:true,
+        calc:'Se consulta el total del área en la tabla A.20. El porcentaje es ese total dividido por los '+fmt(C.sence.apr)+' aprobados regionales, multiplicado por 100.',
+        den:{n:C.sence.apr,label:'participantes aprobados en las 24 áreas de la región, tabla A.1'}})
+    },
+    'sence-sector': {
+      title:'Participantes aprobados por sector de actividad económica',src:['SE_EST'],unit:'participantes aprobados según registro administrativo',
+      read:'El sector corresponde a la actividad económica de la tabla A.18. El porcentaje usa el total regional de aprobados.',
+      limit:'El archivo recibido contiene totales por sector, sin personas, cursos ni planes para desagregar cada cifra. Esta clasificación difiere de la del catálogo de Planes Formativos.',
+      get:key=>({rows:D.senceSector.filter(r=>r.a===key),cols:[{h:'Sector de actividad económica, tabla A.18',k:'a'},{h:'Participantes aprobados',k:'v',n:true},
+        {h:'Región',v:()=>'Coquimbo'},{h:'Año',v:()=>2025},{h:'Nivel del dato recibido',v:()=>'Total agregado por sector'}],weight:r=>r.v,aggregate:true,
+        calc:'Se consulta el total del sector en la tabla A.18. El porcentaje es ese total dividido por los '+fmt(C.sence.apr)+' aprobados regionales, multiplicado por 100.',
+        den:{n:C.sence.apr,label:'participantes aprobados en la región, tabla A.1'}})
+    }
+  };
+  if (!specs[id]) throw new Error('Gráfico sin definición: '+id);
+  return {id,...specs[id]};
+}
+
+function graphSources(spec) {
+  return h('div',{class:'graph-sources'},h('h4',null,'Fuentes y referencia temporal'),spec.src.map(k=>h('p',{class:'mini'},srcText(k),' Hoja: '+SRC[k].hoja+'.')),
+    spec.src.includes('CFT_MX')&&spec.src.some(k=>k.startsWith('CV_'))?h('p',{class:'mini'},TIME_NOTE):null);
+}
+function openOverviewSource(kind) {
+  const definitions={
+    n1:{title:'Carreras con programa de estudio',src:['CFT_PROG'],unit:'carreras con programa',
+      limit:'Las certificaciones semestrales son denominaciones del programa. Su mención no acredita certificación de Chile Valora. Las fuentes no registran fecha de descarga ni actualización del programa.',
+      rows:CARRERAS14.map(k=>({k,title:D.prog[k].titulo,certs:D.prog[k].certs.length,coded:D.prog[k].certs.filter(c=>c.cod).length})),
+      cols:[{h:'Carrera',k:'k'},{h:'Título del programa',k:'title'},{h:'Certificaciones semestrales declaradas',k:'certs',n:true},{h:'Certificaciones que declaran un código de perfil',k:'coded',n:true}],
+      calc:'Cada carrera con programa se cuenta una vez. Las columnas de certificaciones explican los totales semestrales, que son una unidad distinta.'},
+    n2:{title:'Perfiles distintos citados en la matriz',src:['CFT_MX'],unit:'perfiles por código y versión',
+      limit:'Un perfil citado en varias carreras o módulos se cuenta una vez en el total general. La matriz recibida contiene doce hojas de carrera.',
+      rows:MXCODES.map(cod=>({cod,names:uniq(MX.filter(r=>r.cod===cod).map(r=>r.nm)).join('; '),careers:uniq(MX.filter(r=>r.cod===cod).map(r=>r.k)).join('; '),modules:uniq(MX.filter(r=>r.cod===cod).map(r=>r.k+' · semestre '+r.s+' · '+r.m)).join('; ')})),
+      cols:[{h:'Código y versión',k:'cod'},{h:'Nombres citados en la matriz',k:'names'},{h:'Carreras que lo citan',k:'careers'},{h:'Ubicación en la matriz: carrera, semestre y módulo',k:'modules'}],
+      calc:'Se cuenta cada código completo con versión una sola vez entre todas las hojas de la matriz.'},
+    n3:{title:'Perfiles del catálogo Chile Valora',src:['CV_CAT'],unit:'perfiles del catálogo',
+      limit:'El catálogo corresponde a la recopilación de agosto de 2026. Un nivel no informado se mantiene como dato ausente.',rows:D.cat,
+      cols:[{h:'Código y versión',k:'c'},{h:'Nombre del perfil en catálogo',k:'n'},{h:'Sector del catálogo',v:r=>r.s.join('; ')},
+        {h:'Subsector del catálogo',v:r=>r.ss.join('; ')},{h:'Nivel informado',v:r=>r.lv??'No informado'},{h:'Vigencia según catálogo',k:'vg'}],
+      calc:'Se cuenta cada perfil del catálogo recopilado una vez, por su código completo con versión.'},
+    n4:{title:'Registros de articulación de los CFT Estatales',src:['CV_ART'],unit:'registros de articulación',
+      limit:'Un registro no equivale a un perfil distinto: el mismo perfil puede aparecer en varias carreras o CFT.',rows:ART,
+      cols:[{h:'CFT',v:r=>instNice(r.i)},{h:'Carrera registrada',k:'k'},{h:'Perfil según articulación',k:'p'},{h:'Código y versión',k:'c'},{h:'Fila en la base',k:'f'}],
+      calc:'Se cuentan los registros recibidos de los diez CFT Estatales. No se agrupan las repeticiones de perfil entre carreras o instituciones.'},
+    n5:{title:'Certificados históricos de Coquimbo',src:['CV_CERT'],unit:'certificados acumulados',
+      limit:'Son certificados de la serie histórica regional 2002-2026. No equivalen a personas únicas ni se atribuyen al CFT.',rows:D.cert,weight:r=>r.v,
+      cols:[{h:'Perfil según tabla de certificados',k:'n'},{h:'Código base',k:'b'},{h:'Certificados acumulados',k:'v',n:true},{h:'Sector en la tabla de certificados',k:'s'},{h:'Fila en la base',k:'f'}],
+      calc:'Se suman los certificados de todas las filas de la tabla regional. Los códigos base distintos y las filas son unidades diferentes del total de certificados.'},
+    n6:{title:'Centros con región registrada Coquimbo',src:['CV_CEN'],unit:'centros registrados',
+      limit:'El registro de un centro y sus perfiles no acredita cupos, fechas de evaluación ni condiciones actuales de acceso.',
+      rows:[...by(D.cenCoq,r=>r.ct)].map(([ct,rs])=>({ct,vg:uniq(rs.map(r=>r.vg)).join('; '),combinations:rs.length,profiles:uniq(rs.map(r=>baseOf(r.c))).length,sectors:uniq(rs.map(r=>r.s)).join('; '),lines:rs.map(r=>r.f).join('; ')})),
+      cols:[{h:'Centro',k:'ct'},{h:'Vigencia según registro',k:'vg'},{h:'Combinaciones centro y perfil con versión',k:'combinations',n:true},
+        {h:'Perfiles del centro por código base',k:'profiles',n:true},{h:'Sectores en el registro de centros',k:'sectors'},{h:'Filas en la base',k:'lines'}],
+      calc:'Se cuenta una vez cada nombre de centro con región registrada Coquimbo. Los perfiles de las columnas pueden estar compartidos entre centros y no se suman como perfiles distintos.'},
+    n7:{title:'Catálogo completo de Planes Formativos SENCE',src:['SE_PF'],unit:'planes formativos distintos',
+      limit:'Incluye planes con código de perfil, sin perfil declarado y con campo vacío o formato no reconocible. El campo vacío no demuestra ausencia de perfil. El catálogo no acredita ejecución regional.',rows:allPlans,
+      cols:[{h:'Código de plan',k:'p'},{h:'Plan',k:'n'},{h:'Nivel del plan',v:r=>r.lv||'No informado'},{h:'Duración nominal en horas',k:'h'},
+        {h:'Campo original de perfil',v:r=>r.po||'Campo vacío'},{h:'Código reconocible en el campo',v:r=>r.cs.length?'Sí':'No'}],
+      calc:'Se cuenta cada código de plan una vez, aunque en el archivo original ocupe varias filas por sus módulos.'}
+  };
+  const d=definitions[kind],value=d.weight?sum(d.rows,d.weight):d.rows.length;
+  const spec={id:'panorama-'+kind,title:d.title,src:d.src,unit:d.unit,limit:d.limit,get:()=>({...d,den:null})};
+  openBarDetail(spec,{key:kind,label:d.title,total:value});
+}
+function graphReference(spec) {
+  const refs={CFT_PROG:'CFT: programas disponibles en el sitio web al consultar',CFT_MX:'CFT: matriz del 5 de octubre de 2026',CV_ART:'Chile Valora: articulación, recopilación del 21 al 23 de agosto de 2026',
+    CV_CAT:'Chile Valora: catálogo, recopilación del 21 al 23 de agosto de 2026',CV_CERT:'Chile Valora: certificados, serie 2002-2026',
+    CV_CEN:'Chile Valora: centros, recopilación del 21 al 23 de agosto de 2026',SE_PF:'SENCE: catálogo de planes, archivo del 26 de agosto de 2026',SE_EST:'SENCE: estadísticas 2025'};
+  return h('p',{class:'mini graph-reference'},spec.src.map(k=>refs[k]).join(' · '));
+}
+function graphMethod(spec) {
+  openDialog(spec.title,h('div',{class:'graph-method'},
+    h('p',null,spec.read),h('dl',null,h('dt',null,'Unidad'),h('dd',null,spec.unit),h('dt',null,'Alcance'),h('dd',null,spec.limit)),
+    h('p',{class:'mini'},'Abra una barra para consultar su cálculo y los registros que la componen. En barras con colores, puede seleccionar cada segmento; el detalle también permite consultar categorías con valor cero.'),graphSources(spec)));
+}
+function openBarDetail(spec,row,segment=null) {
+  const total=row.total!==undefined?row.total:sum(row.segs||[],s=>s.v);
+  const build=(seg,moveFocus)=>{
+    const info=spec.get(row.key,seg),value=seg===null?total:row.segs[seg].v;
+    const check=info.weight?sum(info.rows,info.weight):info.rows.length;
+    if(check!==value)throw new Error('Los registros no coinciden con la barra: '+spec.id+' / '+row.key);
+    const root=h('div',{class:'bar-detail','data-chart-id':spec.id,'data-value':value,'data-records':info.rows.length,'data-key':row.key,'data-segment':seg===null?'total':seg});
+    root.appendChild(h('p',{class:'graph-selection',role:'status','aria-live':'polite'},row.label+(seg===null?' · Total':' · '+row.segs[seg].t)));
+    root.appendChild(h('p',{class:'graph-amount'},h('strong',null,fmt(value)), ' '+spec.unit));
+    root.appendChild(graphReference(spec));
+    if(info.den)root.appendChild(h('p',{class:'graph-denominator'},`${fmt(value)} de ${fmt(info.den.n)} (${pct(value,info.den.n)}). Referencia: ${info.den.label}.`));
+    root.appendChild(h('p',{class:'mini'},info.calc));
+    if(row.segs){
+      const controls=h('div',{class:'chips graph-breakdown',role:'group','aria-label':'Parte de la barra que desea consultar'});
+      [{t:'Total',v:total,index:null},...row.segs.map((s,index)=>({...s,index}))].forEach(s=>controls.appendChild(h('button',{
+        type:'button',class:'chip','data-part':s.index===null?'total':s.index,'aria-pressed':String(seg===s.index),onclick:()=>build(s.index,true)},s.t+': '+fmt(s.v))));
+      root.appendChild(controls);
+    }
+    root.appendChild(h('p',{class:'graph-limit'},spec.limit));
+    root.appendChild(h('h4',null,info.aggregate?'Dato agregado disponible':'Registros que componen el valor'));
+    root.appendChild(h('p',{class:'mini'},info.aggregate?'La tabla reproduce el total recibido. No hay un desglose individual en esta fuente.':
+      info.weight?`${fmt(info.rows.length)} filas de origen suman ${fmt(value)} ${spec.unit}.`:`Cada fila representa una unidad del conteo: ${fmt(info.rows.length)} en esta selección.`));
+    const csvCols=[...info.cols.map(c=>({h:c.h,k:c.k,v:c.v||c.csvV})),
+      {h:'Grafico',v:()=>spec.title},{h:'Seleccion',v:()=>row.label+(seg===null?' · Total':' · '+row.segs[seg].t)},
+      {h:'Unidad_del_valor',v:()=>spec.unit},{h:'Valor_seleccionado',v:()=>value},{h:'Denominador',v:()=>info.den?.n??'No corresponde'},
+      {h:'Referencia_del_denominador',v:()=>info.den?.label||'Conteo sin porcentaje'},
+      {h:'Calculo',v:()=>info.calc},{h:'Alcance',v:()=>spec.limit},{h:'Fuentes_y_fechas',v:()=>spec.src.map(srcText).join(' ')}];
+    root.appendChild(dataTable(info.cols,info.rows,{max:25,maxH:'360px',csv:'grafico_'+spec.id+'.csv',csvCols,
+      empty:'No hay registros en esta categoría de la barra. Su valor es cero dentro del universo indicado.'}));
+    if(row.onClick)root.appendChild(h('button',{type:'button',class:'btn sm graph-career',onclick:()=>{dlg().close();row.onClick();}},'Ver ficha de la carrera'));
+    root.appendChild(graphSources(spec));
+    const d=dlg(),bd=$('.bd',d);clear(bd);bd.appendChild(root);$('.ttl',d).textContent=spec.title;
+    if(!d.open)showModal(d);
+    if(moveFocus){root.querySelector(`[data-part="${seg===null?'total':seg}"]`)?.focus({preventScroll:true});bd.scrollTop=0;}
+    requestAnimationFrame(refreshScrollHints);
+  };
+  build(segment,false);
+}
+
+/* Resumen al apuntar o enfocar; el clic o toque abre la misma evidencia que el teclado. */
+function bars(rows,opt={}) {
+  const spec=opt.spec;
+  if(!spec)throw new Error('Falta información de lectura para un gráfico de barras.');
+  const max=opt.max||Math.max(1,...rows.map(r=>r.total!==undefined?r.total:sum(r.segs||[],s=>s.v)));
+  const box=h('div',{class:'bars interactive-bars','data-chart-id':spec.id});
+  const captionId='lectura-'+spec.id;
+  box.appendChild(h('div',{class:'graph-guide'},h('p',{id:captionId,class:'mini'},spec.read),
+    h('button',{type:'button',class:'btn sm graph-help','aria-label':'Cómo leer el gráfico: '+spec.title,onclick:()=>graphMethod(spec)},'Cómo leer')));
+  box.appendChild(h('p',{class:'mini graph-hint'},'Seleccione un nombre, valor o segmento para ver su respaldo. Con teclado: Tab, Enter o Espacio.'));
+  const tip=h('div',{class:'graph-tooltip',role:'tooltip',hidden:true});box.appendChild(tip);
+  const hide=()=>{tip.hidden=true;};
+  const bind=(button,row,seg)=>{
+    const total=row.total!==undefined?row.total:sum(row.segs||[],s=>s.v),value=seg===null?total:row.segs[seg].v;
+    const info=spec.get(row.key,seg);
+    button.setAttribute('aria-label',`Ver respaldo de ${row.label}${seg===null?'':', '+row.segs[seg].t}: ${fmt(value)} ${spec.unit}`);
+    button.setAttribute('aria-describedby',captionId);
+    button.addEventListener('click',()=>{hide();openBarDetail(spec,row,seg);});
+    const preview=()=>{
+      clear(tip);tip.appendChild(h('strong',null,row.label));
+      tip.appendChild(h('span',null,`${seg===null?'Total':row.segs[seg].t}: ${fmt(value)} ${spec.unit}.`));
+      if(info.den)tip.appendChild(h('span',null,`${pct(value,info.den.n)} de ${fmt(info.den.n)} ${info.den.label}.`));
+      tip.appendChild(h('span',{class:'tip-action'},'Abra para ver cálculo, fuentes y registros.'));tip.hidden=false;
+      const r=button.getBoundingClientRect(),t=tip.getBoundingClientRect();
+      tip.style.left=Math.max(10,Math.min(r.left,innerWidth-t.width-10))+'px';
+      tip.style.top=Math.max(10,r.bottom+t.height+12<innerHeight?r.bottom+8:r.top-t.height-8)+'px';
+    };
+    button.addEventListener('pointerenter',e=>{if(e.pointerType!=='touch')preview();});
+    button.addEventListener('pointerleave',hide);button.addEventListener('focus',preview);button.addEventListener('blur',hide);
+  };
+  rows.forEach(row=>{
+    const total=row.total!==undefined?row.total:sum(row.segs||[],s=>s.v),segs=row.segs||[{v:total,color:row.color||'var(--navy)'}];
+    const label=h('button',{type:'button',class:'lab graph-total'},row.label);bind(label,row,null);
+    const track=h('div',{class:'bar-track','aria-label':'Composición de '+row.label});
+    segs.forEach((s,i)=>{
+      if(s.v<=0)return;
+      const b=h('button',{type:'button',class:'bar-seg','data-segment':row.segs?i:'total','data-value':s.v,
+        style:{width:(100*s.v/max)+'%',background:s.color}},h('span',{class:'sr'},(s.t||row.label)+': '+fmt(s.v)));
+      bind(b,row,row.segs?i:null);track.appendChild(b);
+    });
+    const val=h('button',{type:'button',class:'graph-total bar-value'},h('span',{class:'val'},row.valueText||fmt(total)),row.note?h('span',{class:'bar-note'},row.note):null);bind(val,row,null);
+    box.appendChild(h('div',{class:'bar-row'+(row.sel?' sel':''),'data-key':row.key,'data-total':total},label,track,val));
   });
+  box.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
+  window.addEventListener('scroll',hide,true);window.addEventListener('resize',hide);
   return box;
 }
+
 function legend(items) {
   return h('div', { class: 'legend' }, items.map(i => h('span', null, h('span', { class: 'sw', style: { background: i.color } }), i.t)));
 }
@@ -875,7 +1146,7 @@ function sankey(host, cfg) {
     lkEls.forEach(e => e.setAttribute('aria-pressed', String(e.classList.contains('sel')))); ndEls.forEach(e => e.setAttribute('aria-pressed', String(e.classList.contains('sel'))));
     recordsBtn.disabled = !state.sel; resetBtn.disabled = !state.sel;
     selectionStatus.textContent = state.sel ? title + ' · ' + fmt(rows.length) + ' registros. Puede consultarlos con el botón siguiente.' : '1. Seleccione un nodo o una conexión. 2. Abra los registros de su selección.';
-    cfg.onSelect && cfg.onSelect(state.sel ? { title, rows, sel: state.sel } : null);
+    cfg.onSelect && cfg.onSelect(state.sel ? { title, rows, sel: state.sel, unit: cfg.unit } : null);
   }
   clear(host);
   host.appendChild(selectionTools);
@@ -902,7 +1173,11 @@ function skDetail(host, cols, csvName) {
     clear(host);
     if (!sel) { host.appendChild(h('div', { class: 'mini' }, 'Seleccione un nodo o una conexión para consultar sus registros. Con teclado: use Tab y active con Enter o Espacio. Repita para quitar la selección. En pantallas pequeñas, desplace el diagrama horizontalmente.')); return; }
     host.setAttribute('role', 'region'); host.setAttribute('aria-label', 'Registros de la selección del diagrama');
-    host.appendChild(h('div', { class: 'selbox' }, h('p', { role: 'status', 'aria-live': 'polite' }, sel.title + ' · ' + fmt(sel.rows.length) + ' registros'),
+    const spec=host.closest('.stage')?.querySelector('.skspec');
+    const provenance=spec?[...spec.children].filter(x=>['Universo','Fuente'].includes(x.querySelector('b')?.textContent)).map(x=>x.textContent.replace(/^(Universo|Fuente)/,'$1: ')).join(' '):'';
+    host.appendChild(h('div', { class: 'selbox' },
+      h('p',{class:'mini'},'Unidad del gráfico: '+(sel.unit||'registros')+'. Cada fila del detalle representa una unidad de la selección.'),
+      provenance?h('p',{class:'mini'},provenance):null, h('p', { role: 'status', 'aria-live': 'polite' }, sel.title + ' · ' + fmt(sel.rows.length) + ' registros'),
       h('button', { class: 'btn sm', type: 'button', onclick: () => {
         const diagram = host.previousElementSibling;
         const selected = diagram?.querySelector(sel.sel.type === 'node' ? '.nd.sel' : '.lk.sel');
@@ -998,7 +1273,7 @@ function renderS1() {
   body.appendChild(h('div', { class: 'exec' }, h('h3', null, 'Mensajes principales'),
     h('ol', null, msgs.map(([a, b, id]) => h('li', null, h('div', null, h('strong', null, a), ' ', b, ' ', h('a', { href: '#' + id }, 'Ver hallazgo')))))));
   body.appendChild(timeWarn());
-  const bx = (t, big, sub, cls) => h('div', { class: 'fbox ' + (cls || '') }, h('div', { class: 't' }, t), big ? h('div', { class: 'big' }, big) : null, h('div', { class: 's' }, sub));
+  const bx = (t, big, sub, cls) => h('div', { class: 'fbox ' + (cls || '') }, h('div', { class: 't' }, t), big ? h('div', { class: 'big' }, big) : null, h('div', { class: 's' }, sub), h('button',{type:'button',class:'btn sm overview-data','data-source':cls,'aria-label':'Ver datos de '+t,onclick:()=>openOverviewSource(cls)},'Ver datos'));
   body.appendChild(h('div', { class: 'flow' }, h('h3', null, 'Cómo se relacionan las fuentes'),
     h('p', { class: 'sub' }, 'El centro del análisis es el perfil ocupacional de Chile Valora, identificado por su código. Cada fuente se vincula con el catálogo de perfiles a través de ese código.'),
     h('div', { class: 'frow main' },
@@ -1066,7 +1341,7 @@ function renderS2() {
     stage1.appendChild(h('h3', null, 'Posición de cada CFT Estatal'));
     stage1.appendChild(h('p', { class: 'sub' }, 'Cada barra corresponde a un CFT Estatal. El CFT Estatal de Coquimbo se destaca en coral.'));
     stage1.appendChild(h('div', { class: 'controls' }, select('Medida', Object.entries(metr).map(([v, a]) => ({ v, t: a[0] })), unit, v => { unit = v; drawBars(); })));
-    stage1.appendChild(bars(rows.map(r => ({ label: instNice(r.i), total: r.v, color: r.i === COQ ? 'var(--coral)' : 'var(--navy)' }))));
+    stage1.appendChild(bars(rows.map(r => ({ key: r.i, label: instNice(r.i), total: r.v, color: r.i === COQ ? 'var(--coral)' : 'var(--navy)' })), {spec:graphSpec('cft-medida', {unit})}));
   };
   drawBars();
 
@@ -1101,14 +1376,14 @@ function renderS2() {
   stage3.appendChild(h('p', { class: 'sub' }, 'Pares CFT–perfil por sector del catálogo de perfiles Chile Valora, separando Coquimbo de los otros 9 CFT Estatales. Esta clasificación no es comparable con las de centros, certificados o SENCE.'));
   const secRows = [...by(C.artPairs, p => p.sector)].map(([s, ps]) => ({ s, coq: ps.filter(p => p.i === COQ).length, otros: ps.filter(p => p.i !== COQ).length })).sort((a, b) => (b.coq + b.otros) - (a.coq + a.otros));
   stage3.appendChild(legend([{ color: 'var(--coral)', t: 'CFT Estatal de Coquimbo' }, { color: 'var(--navy)', t: 'Otros 9 CFT Estatales' }]));
-  stage3.appendChild(bars(secRows.map(r => ({ label: r.s === NOSEC ? NOSEC : titleCase(r.s), segs: [{ v: r.coq, color: 'var(--coral)', t: 'Coquimbo' }, { v: r.otros, color: 'var(--navy)', t: 'Otros CFT' }], valueText: `${r.coq + r.otros} (${pct(r.coq + r.otros, C.artPairs.length)})` }))));
+  stage3.appendChild(bars(secRows.map(r => ({ key: r.s, label: r.s === NOSEC ? NOSEC : titleCase(r.s), segs: [{ v: r.coq, color: 'var(--coral)', t: 'Coquimbo' }, { v: r.otros, color: 'var(--navy)', t: 'Otros CFT' }], valueText: `${r.coq + r.otros} (${pct(r.coq + r.otros, C.artPairs.length)})` })), {spec:graphSpec('art-sector')}));
 
   // Perfiles compartidos
   const stage4 = h('div', { class: 'stage' }); body.appendChild(stage4);
   stage4.appendChild(h('h3', null, 'Perfiles compartidos entre CFT Estatales'));
   const dist = [...by([...C.artShare.values()], a => a.length)].map(([n, a]) => ({ n, c: a.length })).sort((a, b) => a.n - b.n);
   stage4.appendChild(h('p', { class: 'sub' }, 'Número de perfiles (código base) según la cantidad de CFT Estatales que los registran.'));
-  stage4.appendChild(bars(dist.map(d => ({ label: d.n === 1 ? 'Registrado por 1 CFT' : `Registrado por ${d.n} CFT`, total: d.c, color: d.n === 1 ? 'var(--grey)' : 'var(--mint)', valueText: `${d.c} (${pct(d.c, C.artBases.length)})` }))));
+  stage4.appendChild(bars(dist.map(d => ({ key: d.n, label: d.n === 1 ? 'Registrado por 1 CFT' : `Registrado por ${d.n} CFT`, total: d.c, color: d.n === 1 ? 'var(--grey)' : 'var(--mint)', valueText: `${d.c} (${pct(d.c, C.artBases.length)})` })), {spec:graphSpec('art-compartidos')}));
   const shRows = [...C.artShare.entries()].map(([b, a]) => ({ base: b, n: a.length, nombre: a[0].nombre, cft: a.map(p => instShort(p.i)).join(', '), coq: a.some(p => p.i === COQ), sector: a[0].sector })).sort((x, y) => y.n - x.n || x.nombre.localeCompare(y.nombre, 'es'));
   stage4.appendChild(fold('Detalle de perfiles compartidos por dos o más CFT', dataTable([
     { h: 'Perfil', v: r => r.nombre }, { h: 'Código base', html: r => h('span', { class: 'code' }, r.base), v: r => r.base }, { h: 'CFT que lo registran', n: true, v: r => r.n }, { h: 'CFT', v: r => r.cft }, { h: 'Registrado por Coquimbo', v: r => r.coq ? 'Sí' : 'No' }, { h: 'Sector', v: r => r.sector }],
@@ -1200,7 +1475,7 @@ function renderS3() {
   sb.appendChild(h('h3', null, 'Perfiles citados en la matriz según correspondencia con el catálogo'));
   sb.appendChild(h('p', { class: 'sub' }, 'Perfiles distintos (código con versión) por carrera. Un perfil citado en dos carreras se cuenta en cada una.'));
   sb.appendChild(legend(Object.values(ST).map(s => ({ color: s.col, t: s.l }))));
-  sb.appendChild(bars(CAR12.map(k => ({ label: k, segs: ['exacta', 'base', 'sin'].map(s => ({ v: C.mxPerCar[k].st[s], color: ST[s].col, t: ST[s].s })), valueText: `${C.mxPerCar[k].codes.length}`, onClick: () => gotoCarrera(k) })).sort((a, b) => parseInt(b.valueText) - parseInt(a.valueText))));
+  sb.appendChild(bars(CAR12.map(k => ({ key: k, label: k, segs: ['exacta', 'base', 'sin'].map(s => ({ v: C.mxPerCar[k].st[s], color: ST[s].col, t: ST[s].s })), valueText: `${C.mxPerCar[k].codes.length}`, onClick: () => gotoCarrera(k) })).sort((a, b) => parseInt(b.valueText) - parseInt(a.valueText)), {spec:graphSpec('matriz-catalogo')}));
   const noMx = rows.filter(r => !r.mx).map(r => r.k);
   body.appendChild(h('div', { class: 'findings' },
     finding('obs', `Las ${CARRERAS14.length} carreras cuentan con programa de estudio. ${rows.filter(r => r.mx).length} tienen hoja en la matriz de tributación, ${rows.filter(r => r.ar.length).length} figuran en los registros de articulación de Chile Valora para el CFT Estatal de Coquimbo y ${rows.filter(r => r.dc).length} declaran en su programa perfiles con código.`),
@@ -1423,12 +1698,12 @@ function renderS6() {
   const grid = h('div', { class: 'grid g2' }); body.appendChild(grid);
   const p1 = h('div', { class: 'stage', style: { borderTop: '4px solid var(--navy)' } }, h('h3', null, 'Antecedentes históricos de certificación regional'), h('p', { class: 'sub' }, 'Certificados acumulados por sector registrado en la tabla de certificados de Chile Valora, Región de Coquimbo, serie 2002-2026. No se reclasifican con el catálogo de perfiles.'));
   const secC = [...by(D.cert, r => r.s)].map(([s, rs]) => ({ s, v: sum(rs, r => r.v), n: rs.length })).sort((a, b) => b.v - a.v);
-  p1.appendChild(bars(secC.map(r => ({ label: titleCase(r.s), total: r.v, color: 'var(--navy)', valueText: `${fmt(r.v)} (${pct(r.v, C.certTotal)})` }))));
+  p1.appendChild(bars(secC.map(r => ({ key: r.s, label: titleCase(r.s), total: r.v, color: 'var(--navy)', valueText: `${fmt(r.v)} (${pct(r.v, C.certTotal)})` })), {spec:graphSpec('certificados-sector')}));
   const p2 = h('div', { class: 'stage', style: { borderTop: '4px solid var(--mint)' } }, h('h3', null, 'Perfiles asociados a centros con registro en Coquimbo'), h('p', { class: 'sub' }, 'Combinaciones centro–perfil por sector registrado en la tabla de centros de Chile Valora (recopilación 21 al 23 de agosto de 2026). No se reclasifican con el catálogo de perfiles.'));
   const secN = [...by(D.cenCoq, r => r.s)].map(([s, rs]) => ({ s, rs })).sort((a, b) => b.rs.length - a.rs.length);
   const centros = uniq(D.cenCoq.map(r => r.ct));
   p2.appendChild(legend(centros.map((c, i) => ({ color: ['#2FA79B', '#D4A24C'][i], t: `${c} (vigencia del centro: ${uniq(D.cenCoq.filter(r => r.ct === c).map(r => r.vg)).join(', ')})` }))));
-  p2.appendChild(bars(secN.map(r => ({ label: titleCase(r.s), segs: centros.map((c, i) => ({ v: r.rs.filter(x => x.ct === c).length, color: ['#2FA79B', '#D4A24C'][i], t: c })), valueText: String(r.rs.length) }))));
+  p2.appendChild(bars(secN.map(r => ({ key: r.s, label: titleCase(r.s), segs: centros.map((c, i) => ({ v: r.rs.filter(x => x.ct === c).length, color: ['#2FA79B', '#D4A24C'][i], t: c })), valueText: String(r.rs.length) })), {spec:graphSpec('centros-sector')}));
   grid.appendChild(p1); grid.appendChild(p2);
   // Sankey
   const sk = h('div', { class: 'stage' }); body.appendChild(sk);
@@ -1586,7 +1861,7 @@ function renderS7() {
   b2.appendChild(h('h3', null, 'Perfiles de cada carrera con y sin Plan Formativo vinculado'));
   b2.appendChild(h('p', { class: 'sub' }, 'Perfiles distintos citados en la matriz, según si su código base figura en algún plan del catálogo.'));
   b2.appendChild(legend([{ color: 'var(--mint)', t: 'Con plan vinculado por código base' }, { color: 'var(--grey)', t: 'Sin plan vinculado' }]));
-  b2.appendChild(bars(CAR12.map(k => { const cs = C.mxPerCar[k].codes; const con = cs.filter(c => pfByBase.has(baseOf(c))).length; return { label: k, segs: [{ v: con, color: 'var(--mint)', t: 'Con plan' }, { v: cs.length - con, color: 'var(--grey)', t: 'Sin plan' }], valueText: `${con} de ${cs.length} (${pct(con, cs.length)})`, total: cs.length }; })));
+  b2.appendChild(bars(CAR12.map(k => { const cs = C.mxPerCar[k].codes; const con = cs.filter(c => pfByBase.has(baseOf(c))).length; return { key: k, label: k, segs: [{ v: con, color: 'var(--mint)', t: 'Con plan' }, { v: cs.length - con, color: 'var(--grey)', t: 'Sin plan' }], valueText: `${cs.length} perfiles`, note: `${con} con plan (${pct(con, cs.length)})`, total: cs.length }; }), {spec:graphSpec('carrera-plan')}));
   // Tabla filtrable
   const tb = h('div', { class: 'stage' }); body.appendChild(tb);
   tb.appendChild(h('h3', null, 'Consulta de correspondencias carrera–perfil–plan'));
@@ -1616,15 +1891,15 @@ function renderS7() {
   cmp.appendChild(h('p', { class: 'sub' }, 'Son fuentes de naturaleza distinta y no se comparan entre sí. El catálogo describe planes diseñados a nivel nacional; las estadísticas SENCE 2025 describen participantes aprobados en la región. Ninguna fuente recibida registra la ejecución de cada Plan Formativo en Coquimbo.'));
   const g = h('div', { class: 'grid g2' }); cmp.appendChild(g);
   const areaPf = [...by(uniq(C.carPlanU.map(r => r.plan.p)).map(p => D.pf.find(x => x.p === p)), p => p.ar)].map(([a, ps]) => ({ a, n: ps.length })).sort((x, y) => y.n - x.n);
-  g.appendChild(h('div', null, h('h4', null, 'Planes vinculados a perfiles de la matriz, por área del plan'), h('p', { class: 'mini' }, 'SENCE, catálogo 2026 (archivo del 26 de agosto de 2026). Unidad: plan formativo.'), bars(areaPf.map(r => ({ label: titleCase(r.a), total: r.n, color: 'var(--navy)', valueText: `${r.n} (${pct(r.n, C.mxPfPlanes)})` })))));
+  g.appendChild(h('div', null, h('h4', null, 'Planes vinculados a perfiles de la matriz, por área del plan'), h('p', { class: 'mini' }, 'SENCE, catálogo 2026 (archivo del 26 de agosto de 2026). Unidad: plan formativo.'), bars(areaPf.map(r => ({ key: r.a, label: titleCase(r.a), total: r.n, color: 'var(--navy)', valueText: `${r.n} (${pct(r.n, C.mxPfPlanes)})` })), {spec:graphSpec('planes-area')})));
   const ar = [...D.senceArea].sort((a, b) => b.v - a.v).slice(0, 10);
-  g.appendChild(h('div', null, h('h4', null, 'Participantes aprobados 2025 en la región, por área de capacitación'), h('p', { class: 'mini' }, `SENCE, estadísticas administrativas, año 2025 (tabla A.20). Total regional: ${fmt(C.sence.apr)}. Se muestran las 10 áreas con más participantes.`), bars(ar.map(r => ({ label: titleCase(r.a), total: r.v, color: 'var(--gold)', valueText: `${fmt(r.v)} (${pct(r.v, C.sence.apr)})` })))));
+  g.appendChild(h('div', null, h('h4', null, 'Participantes aprobados 2025 en la región, por área de capacitación'), h('p', { class: 'mini' }, `SENCE, estadísticas administrativas, año 2025 (tabla A.20). Total regional: ${fmt(C.sence.apr)}. Se muestran las 10 áreas con más participantes.`), bars(ar.map(r => ({ key: r.a, label: titleCase(r.a), total: r.v, color: 'var(--gold)', valueText: `${fmt(r.v)} (${pct(r.v, C.sence.apr)})` })), {spec:graphSpec('sence-area')})));
   const og = h('div', { class: 'grid g3', style: { marginTop: '14px' } },
     kpi(fmt(C.otecCoq), 'OTEC vigentes con región Coquimbo', 'SENCE, registro con referencia al 20 de agosto de 2026', 'otecVig', 'c2'),
     kpi(fmt(C.otecAct), 'OTEC que efectuaron capacitación en franquicia tributaria en la región', 'SENCE, estadísticas 2025 (tabla A.23). Universo distinto del registro de vigencia', 'otecAct', 'c3'),
     kpi(pct(C.sence.apr, C.sence.tot), 'Participantes aprobados sobre participantes totales, región', `${fmt(C.sence.apr)} de ${fmt(C.sence.tot)} (SENCE 2025, tabla A.1)`, 'senceTasa', 'c4'));
   cmp.appendChild(og);
-  cmp.appendChild(fold('Estadísticas SENCE 2025 de la región por sector de actividad económica (tabla A.18)', h('div', null, h('p', { class: 'mini' }, 'Sector: actividad económica de las estadísticas SENCE 2025, tabla A.18. No es la clasificación sectorial del catálogo de Planes Formativos.'), bars([...D.senceSector].sort((a, b) => b.v - a.v).map(r => ({ label: titleCase(r.a.replace(/^\d+\.\s*/, '')), total: r.v, color: 'var(--gold)', valueText: `${fmt(r.v)} (${pct(r.v, C.sence.apr)})` }))))));
+  cmp.appendChild(fold('Estadísticas SENCE 2025 de la región por sector de actividad económica (tabla A.18)', h('div', null, h('p', { class: 'mini' }, 'Sector: actividad económica de las estadísticas SENCE 2025, tabla A.18. No es la clasificación sectorial del catálogo de Planes Formativos.'), bars([...D.senceSector].sort((a, b) => b.v - a.v).map(r => ({ key: r.a, label: titleCase(r.a.replace(/^\d+\.\s*/, '')), total: r.v, color: 'var(--gold)', valueText: `${fmt(r.v)} (${pct(r.v, C.sence.apr)})` })), {spec:graphSpec('sence-sector')}))));
   body.appendChild(fold('Catálogo completo: planes con y sin código de perfil', h('div', null,
     h('p', { class: 'mini' }, `${D.pf.length} planes con código reconocible, ${D.pfStats.declaraSin} que declaran no tener perfil, ${D.pfStats.campoVacio} con campo vacío y ${D.pfStats.conTextoSinCodigo} con texto y códigos de formato no reconocible. Los textos originales se conservan y no se corrigen automáticamente.`),
     dataTable([{ h: 'Código plan', v: p => p.p }, { h: 'Plan', v: p => p.n }, { h: 'Nivel del plan', v: p => p.lv || 'No informado' }, { h: 'Horas', v: p => p.h }, { h: 'Sector del plan (catálogo SENCE)', v: p => p.s || 'No informado' }, { h: 'Campo de perfil original', v: p => (p.po || 'Campo vacío').replace(/CHILEVALORA/gi, 'Chile Valora') }, { h: 'Estado del campo', v: p => p.cs.length ? 'Con código reconocible' : !p.po ? 'Campo vacío' : /^SIN PERFIL/i.test(p.po) ? 'Declara no tener perfil' : 'Texto con formato no reconocible' }], allPlans, { max: 20, csv: 'catalogo_completo_planes_sence.csv', sort: 0 })
@@ -1937,13 +2212,15 @@ const HOWTO = {
     ['Mensajes principales', 'Resumen de los resultados centrales. El enlace "Ver hallazgo" lleva al hallazgo de la sección VIII que lo desarrolla, con su evidencia, interpretación y validación.'],
     ['Fechas', 'La matriz del CFT es del 5 de octubre de 2026. Los registros de Chile Valora fueron recopilados entre el 21 y el 23 de agosto de 2026. Las comparaciones entre ambos se leen con ese desfase.'] ] },
   s2: { t: 'Cómo usar los controles de esta sección', items: [
+    ['Barras interactivas', 'Apunte o enfoque para ver la unidad y el valor. Seleccione el nombre, el valor o un segmento para consultar el cálculo, las fuentes y los registros. Puede exportar la selección.'],
     ['Medida', 'Cambia lo que mide cada barra: perfiles distintos por código base, perfiles distintos por código y versión, registros de articulación o carreras con registro.'],
     ['CFT incluidos', 'Los botones activan o desactivan cada CFT Estatal en el diagrama de flujos. Debe quedar al menos uno activo. El diagrama se recalcula con los CFT marcados.'],
     ['Diagrama de flujos', 'Haga clic en un nodo (CFT o sector) o en una conexión para ver debajo los registros que la forman. Un segundo clic sobre el mismo elemento quita la selección. El grosor de la conexión es el número de pares CFT-perfil.'],
     ['Tablas', 'Haga clic en el encabezado de una columna para ordenar. "Exportar CSV" descarga todos los resultados filtrados, en el orden seleccionado, aunque no estén todos desplegados.'] ] },
   s3: { t: 'Cómo usar los controles de esta sección', items: [
+    ['Respaldo de las barras', 'Seleccione un nombre, valor o segmento para consultar el cálculo, la unidad, el denominador y los datos que componen el valor. El detalle permite exportar la selección y consultar las fuentes.'],
     ['Tabla de presencia', 'Muestra siempre las 14 carreras. Cada columna es una fuente independiente: "Sin registro" o "Sin hoja" indica ausencia de información en esa fuente, no ausencia de vínculo.'],
-    ['Ver carrera', 'Abre la sección V con esa carrera seleccionada. También funciona el clic sobre el nombre de una carrera en las barras inferiores.'],
+    ['Ver carrera', 'Abre la sección V con esa carrera seleccionada. En las barras, el nombre abre el respaldo del conteo; dentro del detalle puede usar Ver ficha de la carrera.'],
     ['Barras de correspondencia', 'Cada barra separa los perfiles de la carrera según coincidan con el catálogo por código y versión, solo por código base, o no figuren en él.'] ] },
   s4: { t: 'Cómo usar los controles de esta sección', items: [
     ['Matriz, articulación y programa', 'Matriz: perfil citado en la matriz de tributación. Articulación: perfil presente en el registro de articulación del CFT Coquimbo. Programa: perfil declarado en las certificaciones semestrales del programa. No son equivalentes entre sí.'],
@@ -1956,11 +2233,13 @@ const HOWTO = {
     ['Tabla de módulos y perfiles', 'Una fila por perfil citado en cada módulo. Los bloques con varios perfiles comparten nivel y UCL, y así se indica. Haga clic en una fila para abrir la ficha del perfil. "Exportar CSV" descarga la selección.'],
     ['Detalle curricular y programa', 'Abra los paneles para consultar módulos, niveles, UCL y certificaciones semestrales. La ficha inicial reúne catálogo, certificados, centros y planes por perfil.'] ] },
   s6: { t: 'Cómo usar los controles de esta sección', items: [
+    ['Respaldo de las barras', 'Seleccione un nombre, valor o segmento para consultar el cálculo, la unidad, el denominador y los datos que componen el valor. El detalle permite exportar la selección y consultar las fuentes.'],
     ['Universo de perfiles', 'Elige qué perfiles entran al diagrama: los citados en la matriz o los del registro de articulación del CFT Coquimbo.'],
     ['Carrera', 'Restringe el universo a los perfiles de una carrera. "Todas" usa el universo completo.'],
     ['Diagrama de flujos', 'Tres columnas: correspondencia con el catálogo, antecedente histórico de certificación en la región y centro con registro en Coquimbo. Haga clic en un nodo o conexión para ver los perfiles. Un segundo clic quita la selección.'],
     ['Versiones en centros', 'El detalle incluye coincidencias exactas y versiones distintas. La columna Situación distingue ambos estados. Las diferencias requieren verificación.'] ] },
   s7: { t: 'Cómo usar los filtros de esta sección', items: [
+    ['Respaldo de las barras', 'Seleccione un nombre, valor o segmento para consultar el cálculo, la unidad, el denominador y los datos que componen el valor. El detalle permite exportar la selección y consultar las fuentes.'],
     ['Diagrama', 'Elija Matriz o Articulación y una carrera. Carrera → perfil → plan permite seguir cada relación; Por nivel resume los planes de esa selección. Puede ampliar a Todas las carreras, que genera una vista extensa.'],
     ['Grosor', 'En la vista de tres columnas se cuentan rutas: una por asociación carrera-perfil-plan y una salida por perfil sin plan. No representa horas. En Por nivel se cuentan planes una vez por carrera.'],
     ['Consultar registros', 'Seleccione un nodo o conexión, abra Ver registros de la selección y consulte códigos, versiones, nivel, horas y sector del plan. Puede exportar los registros o volver al diagrama conservando la selección.'],
@@ -2094,7 +2373,7 @@ window.refreshPanelNav = refreshPanelNav;
   const initial = document.getElementById(location.hash.slice(1));
   show(initial?.closest('section.sec')?.id || ids[0], false);
   if (initial && !initial.matches('section.sec')) revealTarget(initial);
-  $('#dlg').addEventListener('close', () => { if (dialogOpener && dialogOpener.isConnected && !dialogOpener.closest('[hidden]')) dialogOpener.focus({ preventScroll: true }); });
+  $('#dlg').addEventListener('close', () => { if (dialogOpener && dialogOpener.isConnected && !dialogOpener.closest('[hidden]') && (document.activeElement === document.body || document.activeElement.closest('#dlg'))) dialogOpener.focus({ preventScroll: true }); });
   $('#dlg .x').addEventListener('click', () => $('#dlg').close());
   $('#dlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   window.OBS = { C, D, MX, MXPAIRS, ART, ARTCOQ, perfilInfo, catStatus, EXP: window.EXPLORER, STATE, fmt, pct };
